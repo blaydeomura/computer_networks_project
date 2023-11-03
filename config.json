@@ -1,0 +1,13 @@
+{
+    "Server_IP_Address": "127.0.0.1",
+    "Source_Port_UDP": 9876,
+    "Destination_Port_UDP": 8765,
+    "Destination_Port_TCP_Head_SYN": 9999,
+    "Destination_Port_TCP_Tail_SYN": 8888,
+    "Port_TCP_Pre_Probing": 7777,
+    "Port_TCP_Post_Probing": 6666,
+    "UDP_Payload_Size": 1000,
+    "Inter_Measurement_Time": 15,
+    "Number_Of_UDP_Packets": 6000,
+    "TTL": 255
+}
