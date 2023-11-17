@@ -250,12 +250,18 @@ int main() {
     // Allocate memory for the packet
     char packet[4096];  // Adjust the size as needed
 
+    // Set up IP and TCP headers for HEAD SYN packet
+    // struct ipheader ip_header_head;
+    // struct tcpheader tcp_header_head;
+    // setIPAndTCPHeaders(&ip_header_head, &tcp_header_head, &config, config.destinationPortTCPHeadSYN);
+
     // Set up IP and TCP headers
     struct ipheader *ip_header = (struct ipheader *)packet;
     struct tcpheader *tcp_header = (struct tcpheader *)(packet + sizeof(struct ipheader));
 
     // Set the packet headers
     setIPAndTCPHeaders(ip_header, tcp_header, &config, config.destinationPortTCPHeadSYN);
+
 
     if (sendto(headSynSocket, packet, ip_header->ip_len, 0, (struct sockaddr *)&addrSynHead, sizeof(struct sockaddr_in)) < 0) {
         perror("Packet send error");
@@ -265,6 +271,10 @@ int main() {
 
     // Close the raw socket
     close(headSynSocket);
+
+    // Free allocated memory
+    free(configData);
+
 
     return 0;
 
