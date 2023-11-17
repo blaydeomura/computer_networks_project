@@ -215,7 +215,7 @@ int main() {
     struct ServerConfig config = parseConfig(configData);
 
 
-//Start raw socket programming
+//---------Start raw socket programming---------
     //setup addr for HEAD syn socket
     struct sockaddr_in addrSynHead;
     addrSynHead.sin_family = AF_INET;
@@ -266,147 +266,9 @@ int main() {
     // Close the raw socket
     close(headSynSocket);
 
-
-
-
-
-
-
     return 0;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// // void setIPAndTCPHeaders(struct ip* ip_header, struct tcphdr* tcp_header, const struct ServerConfig* config, int destinationPort) {
-// void setIPAndTCPHeaders(struct ipheader* ip_header, struct tcpheader* tcp_header, const struct ServerConfig* config, struct sockaddr_in addrSynHead, int destinationPort, char *datagram) {
-
-//     ip_header->ip_hl = 5;  // Header length (5 words)
-//     ip_header->ip_v = 4;   // IPv4
-//     ip_header->ip_tos = 0; // Type of Service
-//     ip_header->ip_len = sizeof(struct ipheader) + sizeof(struct tcpheader); // Total length
-//     ip_header->ip_id = 54321; // Identification (in host byte order)
-//     ip_header->ip_off = 0; // Fragment offset
-//     ip_header->ip_ttl = config->timeToLive;
-//     ip_header->ip_p = 6;
-//     ip_header->ip_sum = 0;
-//     ip_header->ip_dst.s_addr = addrSynHead.sin_addr.s_addr;
-
-//     tcp_header->th_sport = htons(config->sourcePortUDP);
-//     tcp_header->th_dport = htons(destinationPort);
-//     tcp_header->th_seq = random();
-//     tcp_header->th_ack = 0;
-//     tcp_header->th_off = 0;
-//     tcp_header->th_flags = TH_SYN;
-//     tcp_header->th_win = htons(65535); // max window size
-//     tcp_header->th_sum = 0;
-//     tcp_header->th_urp = 0;
-
-//     ip_header->ip_sum = checksum((unsigned short *)datagram, ip_header->ip_len >> 1);
-
-// }
-
-// int main() {
-//     // Read the JSON configuration file
-//     FILE* fp = fopen(CONFIG_FILE, "r");
-//     if (fp == NULL) {
-//         perror("Error opening configuration file");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     fseek(fp, 0, SEEK_END);
-//     long fileSize = ftell(fp);
-//     fseek(fp, 0, SEEK_SET);
-//     char* configData = (char*)malloc(fileSize + 1);
-//     if (configData == NULL) {
-//         perror("Memory allocation error");
-//         fclose(fp);
-//         exit(EXIT_FAILURE);
-//     }
-//     fread(configData, 1, fileSize, fp);
-//     fclose(fp);
-
-//     // Null-terminate the JSON data
-//     configData[fileSize] = '\0';
-
-//     //Fill struct config
-//     struct ServerConfig config = parseConfig(configData);
-
-
-
-
-// //Start raw socket programming
-//     //setup addr for HEAD syn socket
-//     struct sockaddr_in addrSynHead;
-//     addrSynHead.sin_family = AF_INET;
-//     addrSynHead.sin_port = htons(config.destinationPortTCPHeadSYN);
-//     printf("Destination Port TCP Head SYN: %d\n", config.destinationPortTCPHeadSYN);
-//     addrSynHead.sin_addr.s_addr = inet_addr(config.serverIPAddress);
-//     printf("Server IP Address: %s\n", config.serverIPAddress);
-
-
-// //add in addr for udp packet
-
-// //add in addr for TAIL syn packet
-
-//     int headSynSocket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-//     if (headSynSocket == -1) {
-//         perror("Head Syn Socket creation error");
-//         return -1;               
-//     }
-    
-
-
-//     int one = 1;
-//     const int *val = &one;
-//     if (setsockopt (headSynSocket, IPPROTO_RAW, IP_HDRINCL, val, sizeof (one)) < 0) {
-//         printf("Warning: Cannot set HDRINCL!\n");
-//     }
-//     else{
-//         printf("Head syn packet creation worked\n");
-//     }
-//     // int one = 1;
-//     // if (setsockopt(headSynSocket, IPPROTO_RAW, IP_HDRINCL, &one, sizeof(one)) < 0)
-//     // {
-//     //     printf("Warning: Cannot set HDRINCL in head!\n");
-//     //     exit(1); // leave the program
-//     // }
-
-
-
-//     // printf("Server IP Address: %s\n", config.serverIPAddress);
-//     // printf("Source Port UDP: %d\n", config.sourcePortUDP);
-//     // printf("Destination Port UDP: %d\n", config.destinationPortUDP);
-//     // printf("Destination Port TCP Head SYN: %d\n", config.destinationPortTCPHeadSYN);
-//     // printf("Destination Port TCP Tail SYN: %d\n", config.destinationPortTCPTailSYN);
-//     // printf("Port TCP Pre Probing: %d\n", config.portTCPPreProbing);
-//     // printf("Port TCP Post Probing: %d\n", config.portTCPPostProbing);
-//     // printf("UDP Payload Size: %d\n", config.payload);
-//     // printf("Intermeasurement Time: %d\n", config.interMeasurementTime);
-//     // printf("Number of UDP Packets: %d\n", config.numPackets);
-//     // printf("Time To Live (TTL): %d\n", config.timeToLive);
-
-
-//     return 0;
-
-// }
-
 
 //gcc -o client_2 client2.c -lcjson -I/usr/local/opt/cjson/include -L/usr/local/opt/cjson/lib
 
