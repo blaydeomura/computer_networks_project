@@ -555,6 +555,119 @@ int setIPAndTCPHeaders(const struct ServerConfig* config, int destinationPort) {
 
 
 //--------------UDP PACKET FUNCTION-----------------
+void sendUDPPackets(struct ServerConfig config) {
+
+    printf("Starting udp packet sending...\n");
+
+    // 1. Create a UDP socket
+    int udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (udpSocket < 0) {
+        perror("Error creating UDP socket");
+        return;
+    }
+
+
+    int df_flag = 1; // Set to 1 to enable DF
+//    if (setsockopt(udpSocket, IPPROTO_IP, IP_DONTFRAG, &df_flag, sizeof(df_flag)) < 0) {
+    if (setsockopt(udpSocket, IPPROTO_IP, IP_MTU_DISCOVER, &df_flag, sizeof(df_flag)) < 0) {
+        perror("Error setting DF flag for UDP packets");
+        close(udpSocket);
+        return;
+    }
+
+    // 2. Bind the UDP socket to a specific source port
+    struct sockaddr_in clientAddr;
+    memset(&clientAddr, 0, sizeof(clientAddr));
+    clientAddr.sin_family = AF_INET;
+    clientAddr.sin_port = htons(config.sourcePortUDP); // Set the source port here
+    clientAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(udpSocket, (struct sockaddr*)&clientAddr, sizeof(clientAddr)) < 0) {
+        perror("Error binding UDP socket");
+        close(udpSocket);
+        return;
+    }
+
+    struct sockaddr_in serverAddr;
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(config.destinationPortUDP);              // SETS THE SOURCE PORT HERE
+    serverAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
+
+    // 2. Send low entropy packets
+    char lowEntropyData[1000];  // Maximum UDP packet size 
+    memset(lowEntropyData, 0, sizeof(lowEntropyData));  // Fill with zeros 
+
+    for (int i = 0; i < config.numPackets; i++) {
+        // Set the packet ID in the first 2 bytes
+        int packetID = i;
+        lowEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
+        lowEntropyData[1] = packetID & 0xFF;        // Least significant byte
+    
+	// Set TTL
+    	int ttl_value = config.timeToLive;
+    	if (setsockopt(udpSocket, IPPROTO_IP, IP_TTL, &ttl_value, sizeof(ttl_value)) < 0) {
+        	perror("Error setting TTL for UDP packets");
+        	close(udpSocket);
+        	return;
+    	}
+        
+	sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+
+        //memset(packetData + 2, 0, dataLength);
+
+        // Increment the packet ID for the next packet
+        packetID++;
+    }
+    printf("Low entropy packets sent...\n");
+    printf("CLIENT UDP PORT: %d\n", config.sourcePortUDP);
+
+    // 3. Wait for Inter-Measurement Time (γ) seconds
+    sleep(config.interMeasurementTime);  // Adjust the sleep time as needed
+    printf("Waiting inter measurement time...\n");
+
+    // 4. Send high entropy packets
+    char highEntropyData[1000];
+    FILE *randomFile = fopen("random_file", "rb");
+    if (randomFile != NULL) {
+        fread(highEntropyData, sizeof(char), sizeof(highEntropyData), randomFile);
+        fclose(randomFile);
+    } else {
+        perror("Error opening random_file");
+        close(udpSocket);
+        return;
+    }
+   
+    // Reset packetID for high entropy packets
+    for (int i = 0; i < config.numPackets; i++) {
+        int packetID = i;
+        highEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
+        highEntropyData[1] = packetID & 0xFF;        // Least significant byte
+
+        // if the following values matter
+        //memcpy(packetData + 2, highEntropyData, dataLength);
+
+	// Set TTL
+    	int ttl_value = config.timeToLive;
+    	if (setsockopt(udpSocket, IPPROTO_IP, IP_TTL, &ttl_value, sizeof(ttl_value)) < 0) {
+        	perror("Error setting TTL for UDP packets");
+        	close(udpSocket);
+        	return;
+    	}
+
+
+        sendto(udpSocket, highEntropyData, sizeof(highEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+
+        // Increment the packet ID for the next packet
+        packetID++;
+    }
+    printf("Sent high entropy packets...\n");
+
+
+    printf("UDP worked for client\n");
+
+    close(udpSocket);
+}
 
 
 
@@ -563,7 +676,8 @@ void* sendPackets(void* arg) {
     struct ServerConfig* config = (struct ServerConfig*)arg;
     setIPAndTCPHeaders(config, config->destinationPortTCPHeadSYN);
 
-    // TODO: Implement logic to send UDP packets here
+    //send udp packets
+    sendUDPPackets(*config);
 
     setIPAndTCPHeaders(config, config->destinationPortTCPTailSYN);
 
