@@ -555,7 +555,7 @@ main (int argc, char **argv) {
 
 
 
-int setIPAndTCPHeaders(int sd, const struct ServerConfig* config, int destinationPort) {
+int setIPAndTCPHeaders(const struct ServerConfig* config, int destinationPort) {
 
   int i, status, sd, *ip_flags, *tcp_flags;
   const int on = 1;
@@ -663,8 +663,10 @@ int setIPAndTCPHeaders(int sd, const struct ServerConfig* config, int destinatio
     exit (1);
   }
 
+
+  const char* destinationIP = "192.168.64.3";
   // Destination IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET, dst_ip, &(iphdr.ip_dst))) != 1) {
+  if ((status = inet_pton (AF_INET, destinationIP, &(iphdr.ip_dst))) != 1) {
     fprintf (stderr, "inet_pton() failed for destination address.\nError message: %s", strerror (status));
     exit (1);
   }
@@ -815,14 +817,6 @@ main (int argc, char **argv) {
     struct ServerConfig config = parseConfig(configData);
 
 
-    // Head syn
-    int sd;
-    if ((sd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-        perror("socket() failed to get socket descriptor for using ioctl() ");
-        exit(1);
-    }
-    setIPAndTCPHeaders(sd, &config, config.destinationPortTCPHeadSYN);
-    close(sd);
-
+    setIPAndTCPHeaders(&config, config.destinationPortTCPHeadSYN);
     return 0;
 }
