@@ -3,7 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <cjson/cJSON.h>  
+//#include <cjson/cJSON.h>
+#include "cJSON.c"
+#include "cJSON.h"
 #include <sys/time.h> 
 #include <time.h>     
 #include <math.h>     
@@ -173,7 +175,43 @@ void receiveConfigFromClient(struct ServerConfig* serverConfig) {
 }
 
 
+
+/*
 //---UDP CONNECTION---
+void sendCompressionStatusToClient(struct ServerConfig config, int compressionDetected) {
+
+    int postProbingSocket;
+    struct sockaddr_in serverAddr;
+
+    // 1. Create a socket
+    postProbingSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (postProbingSocket == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Initialize server address structure
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(config.portTCPPreProbing);
+
+    serverAddr.sin_addr.s_addr = inet_addr("192.168.64.2"); //CHANGED
+
+    // 3. Connect to the server
+    if (connect(postProbingSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        printf("error connecting to server\n");
+        exit(EXIT_FAILURE);
+    }
+    // Send compression detection status to the client
+    send(postProbingSocket, &compressionDetected, sizeof(int), 0);
+
+    // Close the socket
+    close(postProbingSocket);
+
+
+}
+*/
+
 
 // Function to recieve UDP packets
 // void receiveUDPPackets(int numLowEntropyPackets, int numHighEntropyPackets) {
@@ -242,54 +280,130 @@ void receiveUDPPackets(struct ServerConfig config) {
     }
     gettimeofday(&endTimeHighEntropy, NULL); // Record end time for high entropy
 
-    printf("UDP Packets recieved from client\n");
+    printf("High entropy packets recieved from client\n");
 
     close(udpSocket);
 
-    // Calculate time differences
+
+
+
+    int serverSocket, clientSocket;
+//   struct sockaddr_in serverAddr, clientAddr;
+//    socklen_t addrSize = sizeof(clientAddr);
+
+    // 1. Server creates socket 
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize server address structure
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_TCP_PORT);    //FIX THIS LATER BECAUSE it will be passed in as command line argument
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    // 2. Bind the socket to server's address
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error binding socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // 3. Listen for incoming connections from client/s
+    if (listen(serverSocket, 5) == -1) {
+        perror("Error listening for connections");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Server is listening on port %d...\n", SERVER_TCP_PORT);
+
+    // 4. Accept and the server and client are now connected
+    clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &addrSize);
+    if (clientSocket == -1) {
+        perror("Error accepting connection");
+        exit(EXIT_FAILURE);
+    }
+    // Close the client and server sockets
+    close(clientSocket);
+    close(serverSocket);
+
+
+
+/*
+
+    // Now, establish a TCP connection
+    int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (tcpSocket == -1) {
+        perror("Error creating TCP socket");
+        exit(EXIT_FAILURE);
+    }
+
+
+        // Set SO_REUSEADDR option
+    int enable = 1;
+    if (setsockopt(tcpSocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        exit(EXIT_FAILURE);
+    }
+
+    struct sockaddr_in tcpServerAddr;
+    memset(&tcpServerAddr, 0, sizeof(tcpServerAddr));
+    tcpServerAddr.sin_family = AF_INET;
+    tcpServerAddr.sin_port = htons(config.portTCPPostProbing);
+    tcpServerAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
+
+    if (bind(tcpSocket, (struct sockaddr*)&tcpServerAddr, sizeof(tcpServerAddr)) == -1) {
+        perror("Error binding TCP socket");
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(tcpSocket, 1) == -1) {  // Listen for one connection
+        perror("Error listening for TCP connection");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Waiting for TCP connection...\n");
+
+    // Accept the incoming TCP connection
+    int tcpClientSocket = accept(tcpSocket, NULL, NULL);
+    if (tcpClientSocket == -1) {
+        perror("Error accepting TCP connection");
+        exit(EXIT_FAILURE);
+    }
+*/
+/*
+    // Now you can use tcpClientSocket to send/receive data over the established TCP connection
+    // Now you can use tcpClientSocket to send/receive data over the established TCP connection
     double timeDifferenceLowEntropy = difftime(endTimeLowEntropy.tv_usec, startTimeLowEntropy.tv_usec);
     double timeDifferenceHighEntropy = difftime(endTimeHighEntropy.tv_usec, startTimeHighEntropy.tv_usec);
 
-    if (fabs(timeDifferenceHighEntropy - timeDifferenceLowEntropy) > 100000.0) {
-        printf("Compression detected!\n");
-        // You can send this information to the client if needed
-    } else {
-        printf("No compression was detected\n");
-    }
+    int compressionDetected = (fabs(timeDifferenceHighEntropy - timeDifferenceLowEntropy) > 100000.0);
+
+    printf("Compression detected: %d\n", compressionDetected);
+
+//    send(tcpClientSocket, &compressionDetected, sizeof(int), 0);
+
+
+    // Close the TCP sockets
+    close(tcpClientSocket);
+    close(tcpSocket);
+*/
+    printf("UDP Packets received from client\n");
 }
+
 
 
 int main() {
     
 
     struct ServerConfig serverConfig; // Declare the server's configuration struct
-
     
-    //receiveConfigFromClient();
     // Call the function to receive and parse the client's JSON configuration
     receiveConfigFromClient(&serverConfig);
 
-    //print check:
-    printf("Main: This Server IP Address: %s\n", serverConfig.serverIPAddress);
-    printf("Main: Source Port UDP: %d\n", serverConfig.sourcePortUDP);
-    printf("Main: Destination Port UDP: %d\n", serverConfig.destinationPortUDP);
-    printf("Main: Destination Port TCP Head SYN: %d\n", serverConfig.destinationPortTCPHeadSYN);
-    printf("Main: Destination Port TCP Tail SYN: %d\n", serverConfig.destinationPortTCPTailSYN);
-    printf("Main: Port TCP Pre Probing: %d\n", serverConfig.portTCPPreProbing);
-    printf("Main: Port TCP Post Probing: %d\n", serverConfig.portTCPPostProbing);
-    printf("Main: UDP Payload: %d\n", serverConfig.payload);
-    printf("Main: Intermeasurement time: %d\n", serverConfig.interMeasurementTime);
-    printf("Main: Number of packets: %d\n", serverConfig.numPackets);
-    printf("Main: Time to live: %d\n", serverConfig.timeToLive);
-
-        // Debugging: Print the parsed server configuration
-    printf("Parsed server configuration:\n");
-    printf("Server IP Address: %s\n", serverConfig.serverIPAddress);
-    printf("Source Port UDP: %d\n", serverConfig.sourcePortUDP);
-
-    // recieve
-    //receiveUDPPackets(10, 10);  // Example: 10 low entropy and 10 high entropy packets
     receiveUDPPackets(serverConfig);
+
 
     return 0;
 }
