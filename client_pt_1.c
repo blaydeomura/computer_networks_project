@@ -6,6 +6,8 @@
 #include "cJSON.c"
 #include "cJSON.h"
 #include <netinet/ip.h>                
+#include <netinet/in.h>
+
 
 #define CONFIG_FILE "config.json"       
 
@@ -240,8 +242,13 @@ void sendUDPPackets(struct ServerConfig config) {
 
 
 
-int establishTCPConnectionToServer(struct ServerConfig config) {
-//void sendConfigToServer(const char *configFile, struct ServerConfig config) {
+
+
+
+
+
+// Function to establish a TCP connection with the server
+int establishTCPConnection(struct ServerConfig config) {
     int clientSocket;
     struct sockaddr_in serverAddr;
 
@@ -255,96 +262,71 @@ int establishTCPConnectionToServer(struct ServerConfig config) {
     // 2. Initialize server address structure
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    // serverAddr.sin_port = htons(SERVER_TCP_PORT); //CHANGE
-    serverAddr.sin_port = htons(config.portTCPPreProbing);
+    serverAddr.sin_port = htons(config.portTCPPostProbing);
+    serverAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
 
-    serverAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress); //CHANGED
+    printf("Port: %d\n", config.portTCPPostProbing);
+    printf("Address: %s\n", config.serverIPAddress);
 
     // 3. Connect to the server
     if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
-        printf("error connecting to server\n");
+        perror("Error connecting to server");
         exit(EXIT_FAILURE);
     }
-    // 6. Send the JSON data to the server
-    //send(clientSocket, null,, 0);
 
+    // 4. Receive data from the server (you can customize this part)
+    char buffer[1024];
+    int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+    if (bytesRead <= 0) {
+        perror("Error receiving data from server");
+        close(clientSocket);
+        exit(EXIT_FAILURE);
+    }
 
-    // Close the socket
+    // Null-terminate the received data
+    buffer[bytesRead] = '\0';
+
+    // 5. Print the received data
+    printf("Received from server: %s\n", buffer);
+
+    // 6. Close the socket
     close(clientSocket);
 
-    printf("Configuration data sent to the server.\n");
-   
-
-/*
-    
-    // Now you can use tcpSocket to send/receive data over the established TCP connection
-    
-    int receivedCompressionDetected;
-
-    // Receive the compression detection result from the server over the TCP connection
-    recv(tcpSocket, &receivedCompressionDetected, sizeof(int), 0);
-
-
-    if (receivedCompressionDetected) {
-        printf("Compression detected on the server side.\n");
-    } else {
-        printf("No compression detected on the server side.\n");
-    }
-
-    // Close the TCP socket when done
-    close(tcpSocket);
-
-    return 0;  // Return a status code if needed
-*/
+    return 0;
 }
 
 
-/*
-int establishTCPConnectionToServer(struct ServerConfig config) {
-    int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (tcpSocket == -1) {
-        perror("Error creating TCP socket");
-        exit(EXIT_FAILURE);
-    }
 
-        // Set SO_REUSEADDR option
-    int enable = 1;
-    if (setsockopt(tcpSocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        perror("setsockopt(SO_REUSEADDR) failed");
-        exit(EXIT_FAILURE);
-    }
 
-    struct sockaddr_in tcpServerAddr;
-    memset(&tcpServerAddr, 0, sizeof(tcpServerAddr));
-    tcpServerAddr.sin_family = AF_INET;
-    tcpServerAddr.sin_port = htons(config.portTCPPostProbing);
-    tcpServerAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
 
-    // Connect to the server's TCP socket
-    if (connect(tcpSocket, (struct sockaddr*)&tcpServerAddr, sizeof(tcpServerAddr)) == -1) {
-        perror("Error connecting to TCP server");
-        exit(EXIT_FAILURE);
-    }
 
-    printf("Connected to TCP server!\n");
 
-    // Now you can use tcpSocket to send/receive data over the established TCP connection
-    
 
-    // Close the TCP socket when done
-    close(tcpSocket);
-
-    return 0;  // Return a status code if needed
-}
-*/
-
-int main() {
-    // Read the JSON configuration file
+int main(int argc, char **argv) {
+ /*
+     	// Read the JSON configuration file
     FILE* fp = fopen(CONFIG_FILE, "r");
     if (fp == NULL) {
         perror("Error opening configuration file");
         exit(EXIT_FAILURE);
     }
+*/
+    const char* configFileName;
+    if (argc > 1) {
+	configFileName = argv[1];
+    }
+    else {
+	printf("Please correct the commandline argument.\n");
+	exit(EXIT_FAILURE);
+    }
+
+    // Read the JSON configuration file
+    FILE* fp = fopen(configFileName, "r");
+    if (fp == NULL) {
+        perror("Error opening configuration file");
+        exit(EXIT_FAILURE);
+    }
+
 
     fseek(fp, 0, SEEK_END);
     long fileSize = ftell(fp);
@@ -373,8 +355,10 @@ int main() {
     // Create a UDP socket and send UDP packets based on the config
     sendUDPPackets(config);
 
+    sleep(10);
+
     //int compressionDetected = establishTCPConnectionToServer(config);
-    establishTCPConnectionToServer(config);
+    establishTCPConnection(config);
 
     // Clean up allocated memory
     free(configData);
