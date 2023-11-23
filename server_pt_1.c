@@ -9,6 +9,8 @@
 #include <sys/time.h> 
 #include <time.h>     
 #include <math.h>     
+#include <netinet/in.h>
+
 
 
 #define SERVER_TCP_PORT 7777  // Comes from commandline
@@ -88,15 +90,8 @@ void handleConfigData(cJSON *json, struct ServerConfig* config) {
 
 
 
-
-
-
-
-
-
-
 //void receiveConfigFromClient() {
-void receiveConfigFromClient(struct ServerConfig* serverConfig) {
+void receiveConfigFromClient(struct ServerConfig* serverConfig, int serverPort) {
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t addrSize = sizeof(clientAddr);
@@ -112,7 +107,7 @@ void receiveConfigFromClient(struct ServerConfig* serverConfig) {
     // Initialize server address structure
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_TCP_PORT);    //FIX THIS LATER BECAUSE it will be passed in as command line argument
+    serverAddr.sin_port = htons(serverPort);    
     serverAddr.sin_addr.s_addr = INADDR_ANY;
 
     // 2. Bind the socket to server's address
@@ -213,8 +208,75 @@ void sendCompressionStatusToClient(struct ServerConfig config, int compressionDe
 */
 
 
+/*
+// Function to establish a TCP connection with the client
+int establishTCPConnection(struct ServerConfig config) {
+    int serverSocket, clientSocket;
+    struct sockaddr_in serverAddr, clientAddr;
+    socklen_t addrSize = sizeof(clientAddr);
+
+    // 1. Server creates socket
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Set SO_REUSEADDR option
+    int reuse = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1) {
+        perror("Error setting SO_REUSEADDR option");
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Initialize server address structure
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(config.portTCPPostProbing);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    // 2. Bind the socket to the server's address
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error binding socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // 3. Listen for incoming connections from the client
+    if (listen(serverSocket, 5) == -1) {
+        perror("Error listening for connections");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Server is listening for TCP connection on port %d...\n", config.portTCPPostProbing);
+
+    // 4. Accept the client connection
+    clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &addrSize);
+    if (clientSocket == -1) {
+        perror("Error accepting connection");
+        exit(EXIT_FAILURE);
+    }
+
+    // 5. Send some data to the client (you can customize this part)
+    const char* message = "Connection established. Hello from server!";
+    send(clientSocket, message, strlen(message), 0);
+
+    // 6. Close the sockets
+    close(clientSocket);
+    close(serverSocket);
+
+    return 0;
+}
+*/
+
+
+
+
+
+
+
 // Function to recieve UDP packets
-// void receiveUDPPackets(int numLowEntropyPackets, int numHighEntropyPackets) {
 void receiveUDPPackets(struct ServerConfig config) {
     struct timeval startTimeLowEntropy, endTimeLowEntropy;
     struct timeval startTimeHighEntropy, endTimeHighEntropy;
@@ -287,91 +349,68 @@ void receiveUDPPackets(struct ServerConfig config) {
 
 
 
-    int serverSocket, clientSocket;
-//   struct sockaddr_in serverAddr, clientAddr;
-//    socklen_t addrSize = sizeof(clientAddr);
+    int serverSocket1, clientSocket1;
+    struct sockaddr_in serverAddr1, clientAddr1;
+    //socklen_t addrSize = sizeof(clientAddr1);
 
-    // 1. Server creates socket 
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket == -1) {
+    // 1. Server creates socket
+    serverSocket1 = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket1 == -1) {
         perror("Error creating socket");
         exit(EXIT_FAILURE);
     }
 
-    // Initialize server address structure
-    memset(&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_TCP_PORT);    //FIX THIS LATER BECAUSE it will be passed in as command line argument
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
 
-    // 2. Bind the socket to server's address
-    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+    // Set SO_REUSEADDR option
+    int reuse = 1;
+    if (setsockopt(serverSocket1, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1) {
+        perror("Error setting SO_REUSEADDR option");
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Initialize server address structure
+    memset(&serverAddr1, 0, sizeof(serverAddr1));
+    serverAddr1.sin_family = AF_INET;
+    serverAddr1.sin_port = htons(config.portTCPPostProbing);
+    serverAddr1.sin_addr.s_addr = INADDR_ANY;
+
+    // 2. Bind the socket to the server's address
+    if (bind(serverSocket1, (struct sockaddr*)&serverAddr1, sizeof(serverAddr1)) == -1) {
         perror("Error binding socket");
         exit(EXIT_FAILURE);
     }
 
-    // 3. Listen for incoming connections from client/s
-    if (listen(serverSocket, 5) == -1) {
+    // 3. Listen for incoming connections from the client
+    if (listen(serverSocket1, 5) == -1) {
         perror("Error listening for connections");
         exit(EXIT_FAILURE);
     }
 
-    printf("Server is listening on port %d...\n", SERVER_TCP_PORT);
+    printf("Server is listening for TCP connection on port %d...\n", config.portTCPPostProbing);
 
-    // 4. Accept and the server and client are now connected
-    clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &addrSize);
-    if (clientSocket == -1) {
+    // 4. Accept the client connection
+    clientSocket1 = accept(serverSocket1, (struct sockaddr*)&clientAddr1, &addrSize);
+    if (clientSocket1 == -1) {
         perror("Error accepting connection");
         exit(EXIT_FAILURE);
     }
-    // Close the client and server sockets
-    close(clientSocket);
-    close(serverSocket);
+
+    // 5. Send some data to the client (you can customize this part)
+    const char* message = "Connection established. Hello from server!";
+    send(clientSocket1, message, strlen(message), 0);
+
+    // 6. Close the sockets
+    close(clientSocket1);
+    close(serverSocket1);
 
 
 
-/*
-
-    // Now, establish a TCP connection
-    int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (tcpSocket == -1) {
-        perror("Error creating TCP socket");
-        exit(EXIT_FAILURE);
-    }
 
 
-        // Set SO_REUSEADDR option
-    int enable = 1;
-    if (setsockopt(tcpSocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        perror("setsockopt(SO_REUSEADDR) failed");
-        exit(EXIT_FAILURE);
-    }
 
-    struct sockaddr_in tcpServerAddr;
-    memset(&tcpServerAddr, 0, sizeof(tcpServerAddr));
-    tcpServerAddr.sin_family = AF_INET;
-    tcpServerAddr.sin_port = htons(config.portTCPPostProbing);
-    tcpServerAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
 
-    if (bind(tcpSocket, (struct sockaddr*)&tcpServerAddr, sizeof(tcpServerAddr)) == -1) {
-        perror("Error binding TCP socket");
-        exit(EXIT_FAILURE);
-    }
 
-    if (listen(tcpSocket, 1) == -1) {  // Listen for one connection
-        perror("Error listening for TCP connection");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Waiting for TCP connection...\n");
-
-    // Accept the incoming TCP connection
-    int tcpClientSocket = accept(tcpSocket, NULL, NULL);
-    if (tcpClientSocket == -1) {
-        perror("Error accepting TCP connection");
-        exit(EXIT_FAILURE);
-    }
-*/
 /*
     // Now you can use tcpClientSocket to send/receive data over the established TCP connection
     // Now you can use tcpClientSocket to send/receive data over the established TCP connection
@@ -384,28 +423,30 @@ void receiveUDPPackets(struct ServerConfig config) {
 
 //    send(tcpClientSocket, &compressionDetected, sizeof(int), 0);
 
-
-    // Close the TCP sockets
-    close(tcpClientSocket);
-    close(tcpSocket);
 */
-    printf("UDP Packets received from client\n");
+    // Close the TCP sockets
 }
 
 
 
-int main() {
-    
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <port_number>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    int serverPort = atoi(argv[1]); // Convert the port number from string to integer
+ 
 
     struct ServerConfig serverConfig; // Declare the server's configuration struct
     
     // Call the function to receive and parse the client's JSON configuration
-    receiveConfigFromClient(&serverConfig);
+    receiveConfigFromClient(&serverConfig, serverPort);
 
     receiveUDPPackets(serverConfig);
 
+  //  establishTCPConnection(serverConfig);
 
     return 0;
 }
 
-// //gcc -o server server_pt_1.c -lcjson -I/usr/local/opt/cjson/include -L/usr/local/opt/cjson/lib
