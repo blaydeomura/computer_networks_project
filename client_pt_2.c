@@ -41,7 +41,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #define CONFIG_FILE "config.json"
-#define RST_TIMEOUT_SEC 5
+#define RST_TIMEOUT_SEC 60
 
 
 // Define some constants.
@@ -561,7 +561,6 @@ void sendUDPPackets(struct ServerConfig config) {
 
     printf("Starting udp packet sending...\n");
 
-    // 1. Create a UDP socket
     int udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpSocket < 0) {
         perror("Error creating UDP socket");
@@ -570,14 +569,12 @@ void sendUDPPackets(struct ServerConfig config) {
 
 
     int df_flag = 1; // Set to 1 to enable DF
-//    if (setsockopt(udpSocket, IPPROTO_IP, IP_DONTFRAG, &df_flag, sizeof(df_flag)) < 0) {
     if (setsockopt(udpSocket, IPPROTO_IP, IP_MTU_DISCOVER, &df_flag, sizeof(df_flag)) < 0) {
         perror("Error setting DF flag for UDP packets");
         close(udpSocket);
         return;
     }
 
-    // 2. Bind the UDP socket to a specific source port
     struct sockaddr_in clientAddr;
     memset(&clientAddr, 0, sizeof(clientAddr));
     clientAddr.sin_family = AF_INET;
@@ -596,7 +593,6 @@ void sendUDPPackets(struct ServerConfig config) {
     serverAddr.sin_port = htons(config.destinationPortUDP);              // SETS THE SOURCE PORT HERE
     serverAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
 
-    // 2. Send low entropy packets
     char lowEntropyData[1000];  // Maximum UDP packet size 
     memset(lowEntropyData, 0, sizeof(lowEntropyData));  // Fill with zeros 
 
@@ -614,9 +610,21 @@ void sendUDPPackets(struct ServerConfig config) {
         	return;
     	}
         
-	sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+	//sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
-        //memset(packetData + 2, 0, dataLength);
+
+    ssize_t sentBytes = sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+
+    if (sentBytes == -1) {
+        perror("Error sending UDP packet");
+        close(udpSocket);
+        return;
+    } else if (sentBytes != sizeof(lowEntropyData)) {
+        fprintf(stderr, "Warning: Not all bytes of the packet were sent.\n");
+        // Handle this case as needed
+    }
+
+
 
         // Increment the packet ID for the next packet
         packetID++;
@@ -624,11 +632,11 @@ void sendUDPPackets(struct ServerConfig config) {
     printf("Low entropy packets sent...\n");
     printf("CLIENT UDP PORT: %d\n", config.sourcePortUDP);
 
-    // 3. Wait for Inter-Measurement Time (γ) seconds
+    //  Wait for Inter-Measurement Time (γ) seconds
     sleep(config.interMeasurementTime);  // Adjust the sleep time as needed
     printf("Waiting inter measurement time...\n");
 
-    // 4. Send high entropy packets
+    // Send high entropy packets
     char highEntropyData[1000];
     FILE *randomFile = fopen("random_file", "rb");
     if (randomFile != NULL) {
@@ -639,10 +647,14 @@ void sendUDPPackets(struct ServerConfig config) {
         close(udpSocket);
         return;
     }
-   
+      
+    printf("Config.numpackets: %d\n", config.numPackets);
+
+
+    int packetID;
     // Reset packetID for high entropy packets
     for (int i = 0; i < config.numPackets; i++) {
-        int packetID = i;
+        packetID = i;
         highEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
         highEntropyData[1] = packetID & 0xFF;        // Least significant byte
 
@@ -678,8 +690,6 @@ void* sendPackets(void* arg) {
     struct ServerConfig* config = (struct ServerConfig*)arg;
     setIPAndTCPHeaders(config, config->destinationPortTCPHeadSYN);
 
-//    sleep(1);
-
     //send udp packets
     sendUDPPackets(*config);
 
@@ -687,16 +697,6 @@ void* sendPackets(void* arg) {
 
     pthread_exit(NULL);
 }
-
-/*
-// Function to listen for RST packets
-void* listenForRST(void* arg) {
-    // TODO: Implement logic to listen for RST packets here
-
-    pthread_exit(NULL);
-}
-*/
-
 
 void rst_error(const char *msg) {
     perror(msg);
@@ -792,14 +792,32 @@ void* listenForRST(void* arg) {
 
 int
 main (int argc, char **argv) {
+    /*
     // Read the JSON configuration file
     FILE* fp = fopen(CONFIG_FILE, "r");
-    //printf("argv[1]: %s", argv[1]);
-    //FILE* fp = fopen(argv[2], "r");
     if (fp == NULL) {
         perror("Error opening configuration file");
         exit(EXIT_FAILURE);
     }
+    */
+
+    const char* configFileName;
+    if (argc > 1) {
+	configFileName = argv[1];
+    }
+    else {
+	printf("Please correct the commandline argument.\n");
+	exit(EXIT_FAILURE);
+    }
+
+    // Read the JSON configuration file
+    FILE* fp = fopen(configFileName, "r");
+    if (fp == NULL) {
+        perror("Error opening configuration file");
+        exit(EXIT_FAILURE);
+    }
+
+
 
     fseek(fp, 0, SEEK_END);
     long fileSize = ftell(fp);
@@ -820,13 +838,7 @@ main (int argc, char **argv) {
     struct ServerConfig config = parseConfig(configData);
 
 
-   // setIPAndTCPHeaders(&config, config.destinationPortTCPHeadSYN);
-
-
-
-
-
-//------------atempting to multithread-------------
+//multithread
     pthread_t sendThread, listenThread;
 
     // Create threads
@@ -850,15 +862,6 @@ main (int argc, char **argv) {
         perror("Error joining listen thread");
         exit(EXIT_FAILURE);
     }
-
-
-
-
-
-
-
-
-
 
     return 0;
 }

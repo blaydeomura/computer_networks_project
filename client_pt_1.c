@@ -3,12 +3,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <cjson/cJSON.h> 
+#include "cJSON.c"
+#include "cJSON.h"
 #include <netinet/ip.h>                
 
 #define CONFIG_FILE "config.json"       
 
-//CHANGE THIS STRUCT NAME
 struct ServerConfig {
     const char* serverIPAddress;
     int sourcePortUDP;
@@ -93,7 +93,6 @@ struct ServerConfig parseConfig(const char* jsonConfig) {
 }
 
 // Function that sends config file to server
-// void sendConfigToServer(const char *configFile, struct ServerConfig config) {
 void sendConfigToServer(const char *configFile, struct ServerConfig config) {
     int clientSocket;
     struct sockaddr_in serverAddr;
@@ -166,13 +165,13 @@ void sendUDPPackets(struct ServerConfig config) {
 
 
     int df_flag = 1; // Set to 1 to enable DF
-    if (setsockopt(udpSocket, IPPROTO_IP, IP_DONTFRAG, &df_flag, sizeof(df_flag)) < 0) {
+    if (setsockopt(udpSocket, IPPROTO_IP, IP_MTU_DISCOVER, &df_flag, sizeof(df_flag)) < 0) {
         perror("Error setting DF flag for UDP packets");
         close(udpSocket);
         return;
     }
 
-    // 2. Bind the UDP socket to a specific source port
+    //  Bind the UDP socket to a specific source port
     struct sockaddr_in clientAddr;
     memset(&clientAddr, 0, sizeof(clientAddr));
     clientAddr.sin_family = AF_INET;
@@ -191,20 +190,16 @@ void sendUDPPackets(struct ServerConfig config) {
     serverAddr.sin_port = htons(config.destinationPortUDP);              // SETS THE SOURCE PORT HERE
     serverAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
 
-    // 2. Send low entropy packets
+    // Send low entropy packets
     char lowEntropyData[1000];  // Maximum UDP packet size 
     memset(lowEntropyData, 0, sizeof(lowEntropyData));  // Fill with zeros 
-
+    int packetID;
     for (int i = 0; i < config.numPackets; i++) {
-        // Set the packet ID in the first 2 bytes
-        int packetID = i;
+        packetID = i;
         lowEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
         lowEntropyData[1] = packetID & 0xFF;        // Least significant byte
 
         sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
-
-        // rest of data 0s?
-        //memset(packetData + 2, 0, dataLength);
 
         // Increment the packet ID for the next packet
         packetID++;
@@ -212,11 +207,11 @@ void sendUDPPackets(struct ServerConfig config) {
     printf("Low entropy packets sent...\n");
     printf("CLIENT UDP PORT: %d\n", config.sourcePortUDP);
 
-    // 3. Wait for Inter-Measurement Time (γ) seconds
+    // Wait for Inter-Measurement Time (γ) seconds
     sleep(config.interMeasurementTime);  // Adjust the sleep time as needed
     printf("Waiting inter measurement time...\n");
 
-    // 4. Send high entropy packets
+    // Send high entropy packets
     char highEntropyData[1000];
     FILE *randomFile = fopen("random_file", "rb");
     if (randomFile != NULL) {
@@ -233,33 +228,116 @@ void sendUDPPackets(struct ServerConfig config) {
         highEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
         highEntropyData[1] = packetID & 0xFF;        // Least significant byte
 
-        // if the following values matter
-        //memcpy(packetData + 2, highEntropyData, dataLength);
-
         sendto(udpSocket, highEntropyData, sizeof(highEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
         // Increment the packet ID for the next packet
         packetID++;
     }
-    printf("Sent high entropy packets...\n");
-
-
-    printf("UDP worked for client\n");
+        printf("High entropy packets sent...\n");
 
     close(udpSocket);
 }
 
 
 
+int establishTCPConnectionToServer(struct ServerConfig config) {
+//void sendConfigToServer(const char *configFile, struct ServerConfig config) {
+    int clientSocket;
+    struct sockaddr_in serverAddr;
+
+    // 1. Create a socket
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Initialize server address structure
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    // serverAddr.sin_port = htons(SERVER_TCP_PORT); //CHANGE
+    serverAddr.sin_port = htons(config.portTCPPreProbing);
+
+    serverAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress); //CHANGED
+
+    // 3. Connect to the server
+    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        printf("error connecting to server\n");
+        exit(EXIT_FAILURE);
+    }
+    // 6. Send the JSON data to the server
+    //send(clientSocket, null,, 0);
 
 
+    // Close the socket
+    close(clientSocket);
+
+    printf("Configuration data sent to the server.\n");
+   
+
+/*
+    
+    // Now you can use tcpSocket to send/receive data over the established TCP connection
+    
+    int receivedCompressionDetected;
+
+    // Receive the compression detection result from the server over the TCP connection
+    recv(tcpSocket, &receivedCompressionDetected, sizeof(int), 0);
 
 
+    if (receivedCompressionDetected) {
+        printf("Compression detected on the server side.\n");
+    } else {
+        printf("No compression detected on the server side.\n");
+    }
+
+    // Close the TCP socket when done
+    close(tcpSocket);
+
+    return 0;  // Return a status code if needed
+*/
+}
 
 
+/*
+int establishTCPConnectionToServer(struct ServerConfig config) {
+    int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (tcpSocket == -1) {
+        perror("Error creating TCP socket");
+        exit(EXIT_FAILURE);
+    }
 
+        // Set SO_REUSEADDR option
+    int enable = 1;
+    if (setsockopt(tcpSocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        exit(EXIT_FAILURE);
+    }
 
-//NEW MAIN
+    struct sockaddr_in tcpServerAddr;
+    memset(&tcpServerAddr, 0, sizeof(tcpServerAddr));
+    tcpServerAddr.sin_family = AF_INET;
+    tcpServerAddr.sin_port = htons(config.portTCPPostProbing);
+    tcpServerAddr.sin_addr.s_addr = inet_addr(config.serverIPAddress);
+
+    // Connect to the server's TCP socket
+    if (connect(tcpSocket, (struct sockaddr*)&tcpServerAddr, sizeof(tcpServerAddr)) == -1) {
+        perror("Error connecting to TCP server");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Connected to TCP server!\n");
+
+    // Now you can use tcpSocket to send/receive data over the established TCP connection
+    
+
+    // Close the TCP socket when done
+    close(tcpSocket);
+
+    return 0;  // Return a status code if needed
+}
+*/
+
 int main() {
     // Read the JSON configuration file
     FILE* fp = fopen(CONFIG_FILE, "r");
@@ -283,39 +361,25 @@ int main() {
     // Null-terminate the JSON data
     configData[fileSize] = '\0';
 
-    printf("Config Data: %s\n", configData);
-
-
     // Parse the JSON configuration and store it in a struct
     struct ServerConfig config = parseConfig(configData);
-
-    printf("Client struct Ip: %s\n", config.serverIPAddress);
-    printf("Client struct src port UDP: %d\n", config.sourcePortUDP);
-    printf("Client struct dest port UDP: %d\n", config.destinationPortUDP);
-    printf("Client struct TCP Head SYN: %d\n", config.destinationPortTCPHeadSYN);
-    printf("Client struct TCP Tail SYN: %d\n", config.destinationPortTCPTailSYN);
-    printf("Client struct TCP Pre Probe: %d\n", config.portTCPPreProbing);
-    printf("Client struct Port TCP Post Probing: %d\n", config.portTCPPostProbing);
-    printf("Client struct UDP Payload: %d\n", config.payload);
-    printf("Client struct Intermeasurement time: %d\n", config.interMeasurementTime);
-    printf("Client struct number of packets: %d\n", config.numPackets);
-    printf("Client struct time to live: %d\n", config.timeToLive);
-
 
     //Create a TCP socket and send the configuration to the server
     sendConfigToServer(configData, config);
 
     //SLEEP HERE
     sleep(10);
-    printf("Sleep here for tcp packet to send\n");
 
-    // // Create a UDP socket and send UDP packets based on the config
+    // Create a UDP socket and send UDP packets based on the config
     sendUDPPackets(config);
+
+    //int compressionDetected = establishTCPConnectionToServer(config);
+    establishTCPConnectionToServer(config);
 
     // Clean up allocated memory
     free(configData);
 
+
     return 0;
 }
 
-//gcc -o client client_pt_1.c -lcjson -I/usr/local/opt/cjson/include -L/usr/local/opt/cjson/lib
