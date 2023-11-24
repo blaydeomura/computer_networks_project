@@ -82,7 +82,6 @@ struct ServerConfig parseConfig(const char* jsonConfig) {
         cJSON_Delete(root);
         printf("Configuration data sent to the server.\n");
     } else {
-        // Handle JSON parsing error
         printf("Error parsing config file and putting it into struct\n");
         const char* error_ptr = cJSON_GetErrorPtr();
         if (error_ptr != NULL) {
@@ -101,7 +100,6 @@ void sendConfigToServer(const char *configFile, struct ServerConfig config) {
     FILE *fp;
     cJSON *json;
 
-    // 1. Create a socket
     clientSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (clientSocket == -1) {
         perror("Error creating socket");
@@ -274,6 +272,7 @@ int establishTCPConnection(struct ServerConfig config) {
         exit(EXIT_FAILURE);
     }
 
+
     // 4. Receive data from the server (you can customize this part)
     char buffer[1024];
     int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
@@ -289,7 +288,24 @@ int establishTCPConnection(struct ServerConfig config) {
     // 5. Print the received data
     printf("Received from server: %s\n", buffer);
 
-    // 6. Close the socket
+    
+    
+    // 5. Print the received data
+    printf("Received from server: %s\n", buffer);
+
+    // Receive compression information
+    int comp_size;
+    int compression = recv(clientSocket, &comp_size, sizeof(comp_size), 0);
+    if (compression == -1) {
+        perror("Error receiving compression information");
+        close(clientSocket);
+        exit(EXIT_FAILURE);
+    } else if (compression == 0) {
+        printf("No compression detected.\n");
+    } else {
+        printf("Compression detected: %d\n", comp_size);
+    }
+
     close(clientSocket);
 
     return 0;
