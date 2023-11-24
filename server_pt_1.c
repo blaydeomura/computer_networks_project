@@ -390,7 +390,7 @@ void receiveUDPPackets(struct ServerConfig config) {
     }
 
     // 5. Send some data to the client (you can customize this part)
-   // const char* message = "Connection established. Hello from server!";
+    //const char* message = "Connection established. Hello from server!";
     //send(clientSocket1, message, strlen(message), 0);
 
     // Now you can use tcpClientSocket to send/receive data over the established TCP connection
