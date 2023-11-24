@@ -272,12 +272,17 @@ int establishTCPConnection(struct ServerConfig config) {
         exit(EXIT_FAILURE);
     }
 
-
+/*
     // 4. Receive data from the server (you can customize this part)
     char buffer[1024];
     int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
     if (bytesRead <= 0) {
-        perror("Error receiving data from server");
+        if (bytesRead == 0) {
+            // Connection closed by the server
+            printf("Connection closed by the server\n");
+        } else {
+            perror("Error receiving data from server");
+        }
         close(clientSocket);
         exit(EXIT_FAILURE);
     }
@@ -287,15 +292,13 @@ int establishTCPConnection(struct ServerConfig config) {
 
     // 5. Print the received data
     printf("Received from server: %s\n", buffer);
-
-    
-    
-    // 5. Print the received data
-    printf("Received from server: %s\n", buffer);
-
+*/
     // Receive compression information
     int comp_size;
     int compression = recv(clientSocket, &comp_size, sizeof(comp_size), 0);
+    printf("Compression: %d\n", compression);
+    
+    printf("Comp_size: %d\n", comp_size);
     if (compression == -1) {
         perror("Error receiving compression information");
         close(clientSocket);
@@ -310,12 +313,6 @@ int establishTCPConnection(struct ServerConfig config) {
 
     return 0;
 }
-
-
-
-
-
-
 
 
 int main(int argc, char **argv) {
