@@ -3,19 +3,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-//#include <cjson/cJSON.h>
 #include "cJSON.c"
 #include "cJSON.h"
 #include <sys/time.h> 
 #include <time.h>     
 #include <math.h>     
 #include <netinet/in.h>
-
-
-
-#define SERVER_TCP_PORT 7777  // Comes from commandline
-
-#define MAX_PACKET_SIZE 2000  // for UDP, is this right?
+#define MAX_PACKET_SIZE 2000  
 
 //Define the struct of config file
 struct ServerConfig {
@@ -122,7 +116,6 @@ void receiveConfigFromClient(struct ServerConfig* serverConfig, int serverPort) 
         exit(EXIT_FAILURE);
     }
 
-    printf("Server is listening on port %d...\n", SERVER_TCP_PORT);
 
     // 4. Accept and the server and client are now connected
     clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &addrSize);
@@ -397,8 +390,25 @@ void receiveUDPPackets(struct ServerConfig config) {
     }
 
     // 5. Send some data to the client (you can customize this part)
-    const char* message = "Connection established. Hello from server!";
-    send(clientSocket1, message, strlen(message), 0);
+   // const char* message = "Connection established. Hello from server!";
+    //send(clientSocket1, message, strlen(message), 0);
+
+    // Now you can use tcpClientSocket to send/receive data over the established TCP connection
+    double timeDifferenceLowEntropy = difftime(endTimeLowEntropy.tv_usec, startTimeLowEntropy.tv_usec);
+    double timeDifferenceHighEntropy = difftime(endTimeHighEntropy.tv_usec, startTimeHighEntropy.tv_usec);
+
+    int compressionDetected = (fabs(timeDifferenceHighEntropy - timeDifferenceLowEntropy) > 100000.0);
+    
+    printf("Time difference: %f\n", fabs(timeDifferenceHighEntropy - timeDifferenceLowEntropy));
+    printf("Compression detected: %d\n", compressionDetected);
+
+    
+    if (send(clientSocket1, &compressionDetected, sizeof(int), 0) == -1) {
+	    perror("Error sending compression detected boolean: \n");
+	    exit(EXIT_FAILURE);
+    }
+
+    //ERROR CHECK HERE
 
     // 6. Close the sockets
     close(clientSocket1);
