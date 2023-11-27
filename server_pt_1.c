@@ -246,7 +246,7 @@ void receiveUDPPackets(struct ServerConfig config) {
     double timeDifferenceLowEntropy = (endTimeLowEntropy.tv_sec - startTimeLowEntropy.tv_sec) + 1e-6 * (endTimeLowEntropy.tv_usec - startTimeLowEntropy.tv_usec);
     printf("timeDifferenceLowEntropy: %f\n", timeDifferenceLowEntropy);
 
-    double timeDifferenceHighEntropy = (endTimeHighEntropy.tv_sec - startTimeHighEntropy.tv_sec) + 1e-6 * (endTimeHighEntropy.tv_usec - startTimeHighEntropy.tv_usec);
+    double timeDifferenceHighEntropy = (endTimeHighEntropy.tv_sec - startTimeHighEntropy.tv_sec + 1) + 1e-6 * (endTimeHighEntropy.tv_usec - startTimeHighEntropy.tv_usec + 1);
     printf("timeDifferenceHighEntropy: %f\n", timeDifferenceHighEntropy);
 
 
@@ -277,7 +277,6 @@ int main(int argc, char **argv) {
 
     struct ServerConfig serverConfig; // Declare the server's configuration struct
     
-    // Call the function to receive and parse the client's JSON configuration
     receiveConfigFromClient(&serverConfig, serverPort);
 
     receiveUDPPackets(serverConfig);
