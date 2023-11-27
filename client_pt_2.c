@@ -5,18 +5,7 @@
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-// Send an IPv4 TCP packet via raw socket.
-// Stack fills out layer 2 (data link) information (MAC addresses) for us.
-// Values set for SYN packet, no TCP options data.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,28 +23,26 @@
 #include <sys/ioctl.h>        // macro ioctl is defined
 #include <bits/ioctls.h>      // defines values for argument "request" of ioctl.
 #include <net/if.h>           // struct ifreq
-
 #include <errno.h>            
 #include "cJSON.c"
 #include "cJSON.h"
 #include <pthread.h>
 #include <sys/time.h>
+#include <signal.h>
 #define CONFIG_FILE "config.json"
-#define RST_TIMEOUT_SEC 60
-
-
-// Define some constants.
 #define IP4_HDRLEN 20         // IPv4 header length
 #define TCP_HDRLEN 20         // TCP header length, excludes options data
+#define RST_TIMEOUT_SEC 45
 
-// Function prototypes
+
+/* Function prototypes */
 uint16_t checksum (uint16_t *, int);
 uint16_t tcp4_checksum (struct ip, struct tcphdr);
 char *allocate_strmem (int);
 uint8_t *allocate_ustrmem (int);
 int *allocate_intmem (int);
 
-
+/* Struct to store configuration data */
 struct ServerConfig {
     const char* serverIPAddress;
     int sourcePortUDP;
@@ -70,15 +57,13 @@ struct ServerConfig {
     int timeToLive;
 };
 
-// Read from config file
-//Populates the struct
+/* This function parses config file and populates struct */
 struct ServerConfig parseConfig(const char* jsonConfig) {
     printf("Start of parsing config file\n");
     struct ServerConfig config;
     cJSON* root = cJSON_Parse(jsonConfig);
 
     if (root != NULL) {
-        // gets variable values from json file
         cJSON* serverIP = cJSON_GetObjectItem(root, "Server_IP_Address");
         cJSON* sourcePortUDP = cJSON_GetObjectItem(root, "Source_Port_UDP");
         cJSON* destinationPortUDP = cJSON_GetObjectItem(root, "Destination_Port_UDP");
@@ -128,7 +113,6 @@ struct ServerConfig parseConfig(const char* jsonConfig) {
         cJSON_Delete(root);
         printf("Configuration data sent to the server.\n");
     } else {
-        // Handle JSON parsing error
         printf("Error parsing config file and putting it into struct\n");
         const char* error_ptr = cJSON_GetErrorPtr();
         if (error_ptr != NULL) {
@@ -141,19 +125,18 @@ struct ServerConfig parseConfig(const char* jsonConfig) {
 }
 
 
+/* This function calculates checksum */
 uint16_t
 checksum (uint16_t *addr, int len) {
   int count = len;
   register uint32_t sum = 0;
   uint16_t answer = 0;
 
-  // Sum up 2-byte values until none or only one byte left.
   while (count > 1) {
     sum += *(addr++);
     count -= 2;
   }
 
-  // Add left-over byte, if any.
   if (count > 0) {
     sum += *(uint8_t *) addr;
   }
@@ -165,14 +148,13 @@ checksum (uint16_t *addr, int len) {
     sum = (sum & 0xffff) + (sum >> 16);
   }
 
-  // Checksum is one's compliment of sum.
   answer = ~sum;
 
   return (answer);
 }
 
 
-// Build IPv4 TCP pseudo-header and call checksum function.
+/* This function builds IPv4 TCP pseudo-header and calls checksum function. */
 uint16_t
 tcp4_checksum (struct ip iphdr, struct tcphdr tcphdr) {
 
@@ -260,7 +242,7 @@ tcp4_checksum (struct ip iphdr, struct tcphdr tcphdr) {
   return checksum ((uint16_t *) buf, chksumlen);
 }
 
-// Allocate memory for an array of chars.
+/* This function allocates memory for an array of chars. */
 char *
 allocate_strmem (int len) {
 
@@ -281,7 +263,7 @@ allocate_strmem (int len) {
   }
 }
 
-// Allocate memory for an array of unsigned chars.
+/* This function allocates memory for an array of unsigned chars.*/
 uint8_t *
 allocate_ustrmem (int len) {
 
@@ -302,7 +284,7 @@ allocate_ustrmem (int len) {
   }
 }
 
-// Allocate memory for an array of ints.
+/* This function allocates memory for an array of ints.*/
 int *
 allocate_intmem (int len) {
 
@@ -323,7 +305,7 @@ allocate_intmem (int len) {
   }
 }
 
-
+/* This function fills out our IP and TCP headers in syn packets */
 int setIPAndTCPHeaders(const struct ServerConfig* config, int destinationPort) {
 
   int i, status, sd, *ip_flags, *tcp_flags;
@@ -556,7 +538,7 @@ int setIPAndTCPHeaders(const struct ServerConfig* config, int destinationPort) {
 }
 
 
-//--------------UDP PACKET FUNCTION-----------------
+/* This function sends low and high entropy packets */
 void sendUDPPackets(struct ServerConfig config) {
 
     printf("Starting udp packet sending...\n");
@@ -566,7 +548,6 @@ void sendUDPPackets(struct ServerConfig config) {
         perror("Error creating UDP socket");
         return;
     }
-
 
     int df_flag = 1; // Set to 1 to enable DF
     if (setsockopt(udpSocket, IPPROTO_IP, IP_MTU_DISCOVER, &df_flag, sizeof(df_flag)) < 0) {
@@ -602,7 +583,6 @@ void sendUDPPackets(struct ServerConfig config) {
         lowEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
         lowEntropyData[1] = packetID & 0xFF;        // Least significant byte
     
-	// Set TTL
     	int ttl_value = config.timeToLive;
     	if (setsockopt(udpSocket, IPPROTO_IP, IP_TTL, &ttl_value, sizeof(ttl_value)) < 0) {
         	perror("Error setting TTL for UDP packets");
@@ -610,9 +590,6 @@ void sendUDPPackets(struct ServerConfig config) {
         	return;
     	}
         
-	//sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
-
-
     ssize_t sentBytes = sendto(udpSocket, lowEntropyData, sizeof(lowEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
     if (sentBytes == -1) {
@@ -621,12 +598,8 @@ void sendUDPPackets(struct ServerConfig config) {
         return;
     } else if (sentBytes != sizeof(lowEntropyData)) {
         fprintf(stderr, "Warning: Not all bytes of the packet were sent.\n");
-        // Handle this case as needed
     }
 
-
-
-        // Increment the packet ID for the next packet
         packetID++;
     }
     printf("Low entropy packets sent...\n");
@@ -650,18 +623,12 @@ void sendUDPPackets(struct ServerConfig config) {
       
     printf("Config.numpackets: %d\n", config.numPackets);
 
-
     int packetID;
-    // Reset packetID for high entropy packets
     for (int i = 0; i < config.numPackets; i++) {
         packetID = i;
         highEntropyData[0] = (packetID >> 8) & 0xFF; // Most significant byte
         highEntropyData[1] = packetID & 0xFF;        // Least significant byte
 
-        // if the following values matter
-        //memcpy(packetData + 2, highEntropyData, dataLength);
-
-	// Set TTL
     	int ttl_value = config.timeToLive;
     	if (setsockopt(udpSocket, IPPROTO_IP, IP_TTL, &ttl_value, sizeof(ttl_value)) < 0) {
         	perror("Error setting TTL for UDP packets");
@@ -669,28 +636,21 @@ void sendUDPPackets(struct ServerConfig config) {
         	return;
     	}
 
-
         sendto(udpSocket, highEntropyData, sizeof(highEntropyData), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
-        // Increment the packet ID for the next packet
         packetID++;
     }
     printf("Sent high entropy packets...\n");
-
-
-    printf("UDP worked for client\n");
 
     close(udpSocket);
 }
 
 
-
-// Function to send SYN and UDP packets
+/* This function sends SYN and UDP packets */
 void* sendPackets(void* arg) {
     struct ServerConfig* config = (struct ServerConfig*)arg;
     setIPAndTCPHeaders(config, config->destinationPortTCPHeadSYN);
 
-    //send udp packets
     sendUDPPackets(*config);
 
     setIPAndTCPHeaders(config, config->destinationPortTCPTailSYN);
@@ -698,11 +658,14 @@ void* sendPackets(void* arg) {
     pthread_exit(NULL);
 }
 
+/* This function is for errros */
 void rst_error(const char *msg) {
     perror(msg);
     exit(EXIT_FAILURE);
 }
 
+
+/* This function listens for RST packets */
 void* listenForRST(void* arg) {
     struct ServerConfig* config = (struct ServerConfig*)arg;
     int sockfd;
@@ -784,6 +747,7 @@ void* listenForRST(void* arg) {
             close(sockfd);
             exit(EXIT_FAILURE);
         }
+
     }
     pthread_exit(NULL);
 }
@@ -792,15 +756,6 @@ void* listenForRST(void* arg) {
 
 int
 main (int argc, char **argv) {
-    /*
-    // Read the JSON configuration file
-    FILE* fp = fopen(CONFIG_FILE, "r");
-    if (fp == NULL) {
-        perror("Error opening configuration file");
-        exit(EXIT_FAILURE);
-    }
-    */
-
     const char* configFileName;
     if (argc > 1) {
 	configFileName = argv[1];
@@ -816,8 +771,6 @@ main (int argc, char **argv) {
         perror("Error opening configuration file");
         exit(EXIT_FAILURE);
     }
-
-
 
     fseek(fp, 0, SEEK_END);
     long fileSize = ftell(fp);
@@ -838,7 +791,7 @@ main (int argc, char **argv) {
     struct ServerConfig config = parseConfig(configData);
 
 
-//multithread
+    /* multithread this application */
     pthread_t sendThread, listenThread;
 
     // Create threads
