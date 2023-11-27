@@ -236,12 +236,14 @@ int establishTCPConnection(struct ServerConfig config) {
 
     int comp_size;
     int compression = recv(clientSocket, &comp_size, sizeof(comp_size), 0);
-    
+    printf("Comp_size: %d\n", comp_size);
+    printf("compression: %d\n", compression);
+
     if (compression == -1) {
         perror("Error receiving compression information. Please rerun application\n");
         close(clientSocket);
         exit(EXIT_FAILURE);
-    } else if (compression == 0) {
+    } else if (comp_size == 0) {
         printf("No compression detected.\n");
     } else {
         printf("Compression detected.\n");
