@@ -319,8 +319,6 @@ int setIPAndTCPHeaders(const struct ServerConfig* config, int destinationPort) {
   struct ifreq ifr;
   void *tmp;
 
-
-  //----------------DECLARE HEADERS----------------
   // Allocate memory for various arrays.
   packet = allocate_ustrmem (IP_MAXPACKET);
   interface = allocate_strmem (40);
@@ -329,7 +327,6 @@ int setIPAndTCPHeaders(const struct ServerConfig* config, int destinationPort) {
   dst_ip = allocate_strmem (INET_ADDRSTRLEN);
   ip_flags = allocate_intmem (4);
   tcp_flags = allocate_intmem (8);
-  //-----------------------------------------------
 
   // Interface to send packet through.
   strcpy (interface, "enp0s1");
